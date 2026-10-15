@@ -1,0 +1,1 @@
+try{if(localStorage.getItem('dar-theme')==='dark')document.body.classList.add('dark');}catch{}
