@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Owner Drive connection | DAR Tax</title>
+<style>body{font:17px/1.6 system-ui;background:#fbf6e8;color:#29291f;max-width:740px;margin:6vh auto;padding:24px}h1{font-size:30px}button,a{font:inherit}button{padding:12px 18px;margin:6px 8px 6px 0;border:1px solid #b18c3c;border-radius:6px;background:#ead49c;cursor:pointer}button:disabled{opacity:.5;cursor:default}a{color:#6c5018}#status{white-space:pre-wrap;padding:16px;background:#fffaf0;border:1px solid #dacdab;border-radius:6px}small{display:block;color:#635d50}.actions{display:flex;flex-wrap:wrap}button:focus-visible,a:focus-visible{outline:3px solid #1b4562;outline-offset:3px}</style></head>
+<body><a href="index.html">DAR Tax · Home</a><h1>Connect the firm's Google Drive</h1><p>This setup is for the website owner. Sign in with your owner account, then choose the Google account that holds your Drive subscription on Google's permission screen.</p><p><strong>Client document uploads are not enabled in this setup version.</strong></p>
+<div class="actions"><button id="login" disabled>Sign in with Google</button><button id="connect" disabled>Connect Google Drive</button><button id="check" disabled>Check connection</button><button id="logout" hidden>Sign out</button></div>
+<p id="status" role="status" aria-live="polite">Loading sign-in…</p><small>Drive access is limited to files this application creates or that you explicitly open with it. No files are uploaded by this page. Connection credentials stay on the backend.</small><p><a href="login.html">Use the website's email/password login</a> · <a href="privacy.html">Privacy information</a></p><noscript>Enable JavaScript to use owner setup.</noscript>
+<script type="module">
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
+import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut} from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
+import {firebaseConfig} from './firebase-config.js';
+const api='https://dar-tax-client-api.dartaxandconsultancy.workers.dev';
+const auth=getAuth(initializeApp(firebaseConfig));
+const byId=id=>document.getElementById(id);
+const status=message=>{byId('status').textContent=message;};
+const ownerUID='rLiEwIxL97gDnmR2CPi7hFaTT9I2';
+let busy=false;
+function controls(){const user=auth.currentUser;const allowed=user?.uid===ownerUID;byId('login').disabled=busy;byId('connect').disabled=busy||!allowed;byId('check').disabled=busy||!allowed;byId('logout').hidden=!user;byId('logout').disabled=busy;}
+async function run(action){busy=true;controls();try{await action();}catch(error){status(error.code==='auth/popup-closed-by-user'?'Sign-in cancelled.':error.message||'The connection could not be completed.');}finally{busy=false;controls();}}
+onAuthStateChanged(auth,user=>{controls();status(!user?'Sign in with your website owner account.':user.uid===ownerUID?'Owner signed in. Connect Drive, or check an existing connection.':'This is not the configured owner account. Sign out and choose your owner account.');});
+byId('login').onclick=()=>run(async()=>{const provider=new GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});await signInWithPopup(auth,provider);});
+byId('logout').onclick=()=>run(()=>signOut(auth));
+byId('connect').onclick=()=>run(async()=>{
+  if(location.origin!=='https://gstexperts.org')throw new Error('Upload this page to gstexperts.org before connecting. Local file previews cannot connect.');
+  const token=await auth.currentUser.getIdToken(true);
+  const form=document.createElement('form');form.method='POST';form.action=api+'/oauth/google/start';
+  const input=document.createElement('input');input.type='hidden';input.name='idToken';input.value=token;form.append(input);document.body.append(form);form.submit();
+});
+byId('check').onclick=()=>run(async()=>{status('Checking the saved Drive connection…');const token=await auth.currentUser.getIdToken(true);const response=await fetch(api+'/owner/check',{method:'POST',headers:{Authorization:'Bearer '+token},cache:'no-store'});const result=await response.json();if(!response.ok)throw new Error(result.error||'Connection check failed.');status(result.message);});
+</script></body></html>
